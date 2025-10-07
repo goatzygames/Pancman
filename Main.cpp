@@ -6,7 +6,14 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include <iostream>
+#include <cmath>
+
+struct Level {
+    int id;
+    std::string name;
+    std::string filename;
+    //sf::Texture previewTexture;
+};
 
 class Player {
     public:
@@ -84,13 +91,31 @@ int main() {
     window.setFramerateLimit(120);
     sf::View view(sf::FloatRect(0, 0, 1280, 704));
 
+    // Level Stuff
+    std::vector<Level> LevelList;
+    LevelList.push_back({0, "FirstLevel", "Levels/level1.txt"});
+    LevelList.push_back({1, "SecondLevel", "Levels/level2.txt"});
+    LevelList.push_back({2, "ThirdLevel", "Levels/level3.txt"});
+    LevelList.push_back({3, "FourthtLevel", "Levels/level4.txt"});
+    LevelList.push_back({4, "FifthLevel", "Levels/level5.txt"});
+    LevelList.push_back({5, "SixthLevel", "Levels/level6.txt"});
+
+    float startY = 100.0f;
+    float buttonHeight = 80.0f;
+    float spacing = 15.0f;
+    float scrollOffset = 0.0f;
+    int currentPage = 0;
+    const int levelsPerPage = 5;
+    int totalLevels = LevelList.size();
+    int totalPages = std::ceil(totalLevels / static_cast<float>(levelsPerPage));
+
     // Clock
     sf::Clock clock;
 
     // Variables
     float Cooldown;
-    enum class GameState {Menu, Playing};
-    GameState currentState = GameState::Playing;
+    enum class GameState {Menu, LevelChoose, Playing};
+    GameState currentState = GameState::LevelChoose;
     bool canJump = false;
 
     sf::Vector2f playerPos;
@@ -148,15 +173,26 @@ int main() {
     topbar.setTexture(&topbarTex);
     topbar.setSize(sf::Vector2f(1280, 80));
 
+    // Menu UI
     // Title
     sf::Text title;
     title.setString("Pancman");
+    sf::Font font;
+    if (!font.loadFromFile("Assets/Font/Pixellari.ttf")) {
+        std::printf("Whaat");
+    };
+        sf::Text prevText(" < ", font, 30);
+        sf::Text nextText(" > ", font, 30);
 
     loadLevel("Levels/level1.txt", tiles, grass, dirt, testgoal, emptytex, spiketex);
 
     // While the window is open
     while (window.isOpen()) {
         sf::Event event;
+
+        sf::Vector2u windowSize = window.getSize();
+        unsigned int windowWidth = windowSize.x;
+        unsigned int windowHeight = windowSize.y;
 
         float dt = clock.restart().asSeconds();
         Cooldown -= dt;
@@ -168,7 +204,38 @@ int main() {
             if (event.type == sf::Event::Closed) {
                 window.close();
             }
+
+
+            // Mouse events
+            if (currentState == GameState::LevelChoose) {
+            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                sf::Vector2f mousePos(event.mouseButton.x, event.mouseButton.y);
+                if (prevText.getGlobalBounds().contains(mousePos)) {
+                    if (currentPage > 0) {
+                        currentPage--;
+                    }
+                }
+                     else if (nextText.getGlobalBounds().contains(mousePos)) {
+                        if (currentPage < totalPages - 1) {
+                            currentPage++;
+                        }
+                    }
+                    int startIndex12 = currentPage * levelsPerPage;
+                    int endIndex12 = std::min(startIndex12 + levelsPerPage, totalLevels);
+                    for (int i = startIndex12; i < endIndex12; ++i) {
+                        int displayIndex = i - startIndex12;
+                        float y = startY + displayIndex * (buttonHeight + spacing);
+                        sf::FloatRect buttonRect(100.0f, y, windowWidth - 200.0f, buttonHeight);
+                        if (buttonRect.contains(mousePos)) {
+                            tiles.clear();
+                            currentState = GameState::Playing;
+                            loadLevel(LevelList[i].filename, tiles, grass, dirt, testgoal, emptytex, spiketex);
+                            break;
+                        }
+                    }
+            }
         }
+    }
 
         playerPos = player.sprite.getPosition();
         viewCenter = view.getCenter();
@@ -210,7 +277,7 @@ int main() {
 
     }
 
-
+        // Tile collisions
         for (auto& tile : tiles) {
             sf::FloatRect playerBounds = player.sprite.getGlobalBounds();
             sf::FloatRect tileBounds = tile.sprite.getGlobalBounds();
@@ -247,6 +314,7 @@ int main() {
             }
         }
 
+
         // Draw correct things
         if (currentState == GameState::Menu) {
             window.clear();
@@ -261,6 +329,36 @@ int main() {
                 window.draw(tile.sprite);
             }
             window.draw(player.sprite);
+        } else if (currentState == GameState::LevelChoose) {
+            window.clear();
+            window.draw(skySprite);
+        
+             // Level list
+            int startIndex = currentPage * levelsPerPage;
+            int endIndex = std::min(startIndex + levelsPerPage, totalLevels);
+
+            for (int i = startIndex; i < endIndex; ++i) {
+            int displayIndex = i - startIndex;
+            float y = startY + displayIndex * (buttonHeight + spacing);
+
+            sf::RectangleShape levelButton(sf::Vector2f(windowWidth - 200.0f, buttonHeight));
+            levelButton.setPosition(100.0f, y);
+            levelButton.setFillColor(sf::Color(80, 80, 80));
+
+            sf::Text levelNameText;
+            levelNameText.setFont(font);
+            levelNameText.setString(LevelList[i].name);
+            levelNameText.setPosition(120.0f, y + 20.0f);
+
+            window.draw(levelButton);
+            window.draw(levelNameText);
+
+            prevText.setPosition(100, windowHeight - 100);
+            nextText.setPosition(windowWidth - 200, windowHeight - 100);
+
+            window.draw(prevText);
+            window.draw(nextText);
+            }
         }
 
         window.draw(topbar);
